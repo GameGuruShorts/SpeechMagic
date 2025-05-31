@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Voice Magic Battle</title>
+  <style>
+    body {
+      background: #001020;
+      color: white;
+      text-align: center;
+      font-family: sans-serif;
+      padding: 20px;
+    }
+    canvas {
+      background: #202040;
+      border: 2px solid #333;
+      display: block;
+      margin: 20px auto;
+    }
+    button {
+      font-size: 18px;
+      padding: 10px 20px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    #spellEffect {
+      position: absolute;
+      top: 150px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 100px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🎤 Voice Magic Battle</h1>
+<p>Say a spell: <strong>fireball</strong>, <strong>ice shard</strong>, <strong>lightning</strong>, <strong>wind blast</strong>, <strong>meteor storm</strong>, <strong>dragon roar</strong>, <strong>heal</strong></p>
+
+<canvas id="gameCanvas" width="600" height="300"></canvas>
+<img id="spellEffect" src="" alt="Spell Animation" />
+<button id="castButton">🎙️ Cast Spell</button>
+<p id="status"></p>
+<p id="enemyHealth"></p>
+<p id="playerHealth"></p>
+
+<script>
+  const spells = {
+    "fireball": { damage: 30, image: "https://media.giphy.com/media/l1J9wGkE44dU0/giphy.gif" },
+    "ice shard": { damage: 20, image: "https://media.giphy.com/media/l0HlK9Wo9QhjqybQw/giphy.gif" },
+    "lightning": { damage: 40, image: "https://media.giphy.com/media/l0Ex3x8M2WlxK/giphy.gif" },
+    "wind blast": { damage: 25, image: "https://media.giphy.com/media/xT9IgtKZY6nXjXWJ4k/giphy.gif" },
+    "meteor storm": { damage: 60, image: "https://media.giphy.com/media/XIqCQx02E1U9W/giphy.gif" },
+    "dragon roar": { damage: 80, image: "https://media.giphy.com/media/VbnUQpnihPSIgIXuZv/giphy.gif" },
+    "heal": { heal: 30, image: "https://media.giphy.com/media/l0MYEqEzwMWFCg8rm/giphy.gif" }
+  };
+
+  let enemyHealth = 100;
+  let playerHealth = 100;
+
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  const status = document.getElementById("status");
+  const enemyHealthEl = document.getElementById("enemyHealth");
+  const playerHealthEl = document.getElementById("playerHealth");
+  const castButton = document.getElementById("castButton");
+  const spellEffect = document.getElementById("spellEffect");
+
+  const attackSound = new Audio("https://cdn.pixabay.com/audio/2022/03/31/audio_cbb4c1f8b7.mp3");
+
+  function drawGame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Enemy
+    ctx.fillStyle = "#800000";
+    ctx.fillRect(250, 100, 100, 100);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("Enemy", 275, 95);
+
+    ctx.fillStyle = "#333";
+    ctx.fillRect(225, 80, 150, 10);
+    ctx.fillStyle = "#f44";
+    ctx.fillRect(225, 80, (enemyHealth / 100) * 150, 10);
+
+    // Player
+    ctx.fillStyle = "#333";
+    ctx.fillRect(20, 20, 150, 10);
+    ctx.fillStyle = "#4f4";
+    ctx.fillRect(20, 20, (playerHealth / 100) * 150, 10);
+    ctx.fillStyle = "#fff";
+    ctx.fillText("You", 75, 15);
+  }
+
+  function updateUI() {
+    enemyHealthEl.textContent = `Enemy Health: ${Math.max(enemyHealth, 0)}`;
+    playerHealthEl.textContent = `Your Health: ${Math.max(playerHealth, 0)}`;
+  }
+
+  function enemyAttack() {
+    let damage = Math.floor(Math.random() * 20) + 5;
+    playerHealth -= damage;
+    status.textContent += ` | Enemy attacks you for ${damage}!`;
+    updateUI();
+    drawGame();
+
+    if (playerHealth <= 0) {
+      status.textContent = "You were defeated!";
+      castButton.disabled = true;
+    }
+  }
+
+  function showSpellAnimation(imageUrl) {
+    spellEffect.src = imageUrl;
+    spellEffect.style.display = "block";
+    setTimeout(() => spellEffect.style.display = "none", 1000);
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    status.textContent = "Your browser doesn't support voice recognition.";
+    castButton.disabled = true;
+  }
+
+  const recognizer = new SpeechRecognition();
+  recognizer.lang = "en-US";
+  recognizer.interimResults = false;
+  recognizer.maxAlternatives = 1;
+
+  recognizer.onresult = function (event) {
+    let spoken = event.results[0][0].transcript.toLowerCase().trim();
+    status.textContent = `You said: "${spoken}"`;
+
+    if (spoken in spells) {
+      const spell = spells[spoken];
+      showSpellAnimation(spell.image);
+      attackSound.play();
+
+      if (spell.damage) {
+        enemyHealth -= spell.damage;
+        status.textContent += ` — ${spoken} hits enemy for ${spell.damage}!`;
+      }
+
+      if (spell.heal) {
+        playerHealth = Math.min(100, playerHealth + spell.heal);
+        status.textContent += ` — You heal for ${spell.heal}!`;
+      }
+
+      if (enemyHealth <= 0) {
+        status.textContent = "🎉 Enemy defeated! You win!";
+        castButton.disabled = true;
+        drawGame();
+        updateUI();
+        return;
+      }
+
+      updateUI();
+      drawGame();
+      setTimeout(enemyAttack, 1000);
+
+    } else {
+      status.textContent += " — Spell not recognized!";
+    }
+  };
+
+  recognizer.onerror = function (event) {
+    status.textContent = "Error: " + event.error;
+  };
+
+  castButton.addEventListener("click", () => {
+    if (playerHealth > 0 && enemyHealth > 0) {
+      status.textContent = "🎤 Listening...";
+      recognizer.start();
+    }
+  });
+
+  drawGame();
+  updateUI();
+</script>
+
+</body>
+</html>
